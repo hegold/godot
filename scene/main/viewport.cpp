@@ -1706,117 +1706,132 @@ bool Viewport::_gui_drop(Control *p_at_control, Point2 p_at_pos, bool p_just_che
 	return false;
 }
 
-void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
-	ERR_FAIL_COND(p_event.is_null());
+bool Viewport::_gui_input_event_mousebutton(Ref<InputEventMouseButton> mb) {
+	// TEMP TEMP TEMP
+	// return true if the caller should return (would have returned pre-refactor)
 
-	Ref<InputEventMouseButton> mb = p_event;
-	if (mb.is_valid()) {
-		gui.key_event_accepted = false;
+	if (!mb.is_valid()) {
+		return false;
+	}
 
-		Point2 mpos = mb->get_position();
-		if (mb->is_pressed()) {
-			MouseButtonMask button_mask = mouse_button_to_mask(mb->get_button_index());
-			if (!gui.mouse_focus_mask.is_empty() && !gui.mouse_focus_mask.has_flag(button_mask)) {
-				// Do not steal mouse focus and stuff while a focus mask without the current mouse button exists.
-				gui.mouse_focus_mask.set_flag(button_mask);
-			} else {
-				gui.mouse_focus = gui_find_control(mpos);
-				gui.last_mouse_focus = gui.mouse_focus;
+	gui.key_event_accepted = false;
 
-				if (!gui.mouse_focus) {
-					return;
-				}
+	Point2 mpos = mb->get_position();
+	if (mb->is_pressed()) {
+		MouseButtonMask button_mask = mouse_button_to_mask(mb->get_button_index());
+		if (!gui.mouse_focus_mask.is_empty() && !gui.mouse_focus_mask.has_flag(button_mask)) {
+			// Do not steal mouse focus and stuff while a focus mask without the current mouse button exists.
+			gui.mouse_focus_mask.set_flag(button_mask);
+		} else {
+			gui.mouse_focus = gui_find_control(mpos);
+			gui.last_mouse_focus = gui.mouse_focus;
 
-				gui.mouse_focus_mask.set_flag(mouse_button_to_mask(mb->get_button_index()));
-
-				if (mb->get_button_index() == MouseButton::LEFT) {
-					gui.drag_accum = Vector2();
-					gui.drag_attempted = false;
-				}
+			if (!gui.mouse_focus) {
+				return true;
 			}
-			DEV_ASSERT(gui.mouse_focus);
 
-			mb = mb->xformed_by(Transform2D()); // Make a copy of the event.
+			gui.mouse_focus_mask.set_flag(mouse_button_to_mask(mb->get_button_index()));
 
-			Point2 pos = gui.mouse_focus->get_global_transform_with_canvas().affine_inverse().xform(mpos);
-			mb->set_position(pos);
+			if (mb->get_button_index() == MouseButton::LEFT) {
+				gui.drag_accum = Vector2();
+				gui.drag_attempted = false;
+			}
+		}
+		DEV_ASSERT(gui.mouse_focus);
+
+		mb = mb->xformed_by(Transform2D()); // Make a copy of the event.
+
+		Point2 pos = gui.mouse_focus->get_global_transform_with_canvas().affine_inverse().xform(mpos);
+		mb->set_position(pos);
 
 #ifdef DEBUG_ENABLED
-			if (EngineDebugger::get_singleton()) {
-				Array arr;
-				arr.push_back(gui.mouse_focus->get_path());
-				arr.push_back(gui.mouse_focus->get_class());
-				EngineDebugger::get_singleton()->send_message("scene:click_ctrl", arr);
-			}
+		if (EngineDebugger::get_singleton()) {
+			Array arr;
+			arr.push_back(gui.mouse_focus->get_path());
+			arr.push_back(gui.mouse_focus->get_class());
+			EngineDebugger::get_singleton()->send_message("scene:click_ctrl", arr);
+		}
 #endif
 
-			if (mb->get_button_index() == MouseButton::LEFT) { // Assign focus.
-				CanvasItem *ci = gui.mouse_focus;
-				while (ci) {
-					Control *control = Object::cast_to<Control>(ci);
-					if (control) {
-						if (control->get_focus_mode() != Control::FOCUS_NONE) {
-							if (control != gui.key_focus) {
-								control->grab_focus();
-							}
-							break;
+		if (mb->get_button_index() == MouseButton::LEFT) { // Assign focus.
+			CanvasItem *ci = gui.mouse_focus;
+			while (ci) {
+				Control *control = Object::cast_to<Control>(ci);
+				if (control) {
+					if (control->get_focus_mode() != Control::FOCUS_NONE) {
+						if (control != gui.key_focus) {
+							control->grab_focus();
 						}
-
-						if (control->data.mouse_filter == Control::MOUSE_FILTER_STOP) {
-							break;
-						}
-					}
-
-					if (ci->is_set_as_top_level()) {
 						break;
 					}
 
-					ci = ci->get_parent_item();
+					if (control->data.mouse_filter == Control::MOUSE_FILTER_STOP) {
+						break;
+					}
 				}
-			}
 
-			bool stopped = gui.mouse_focus && gui.mouse_focus->can_process() && _gui_call_input(gui.mouse_focus, mb);
-			if (stopped) {
-				set_input_as_handled();
-			}
+				if (ci->is_set_as_top_level()) {
+					break;
+				}
 
-			if (gui.dragging && mb->get_button_index() == MouseButton::LEFT) {
-				// Alternate drop use (when using force_drag(), as proposed by #5342).
-				_perform_drop(gui.mouse_focus, pos);
-			}
-
-			_gui_cancel_tooltip();
-		} else {
-			if (gui.dragging && mb->get_button_index() == MouseButton::LEFT) {
-				_perform_drop(gui.drag_mouse_over, gui.drag_mouse_over_pos);
-			}
-
-			gui.mouse_focus_mask.clear_flag(mouse_button_to_mask(mb->get_button_index())); // Remove from mask.
-
-			if (!gui.mouse_focus) {
-				// Release event is only sent if a mouse focus (previously pressed button) exists.
-				return;
-			}
-
-			mb = mb->xformed_by(Transform2D()); // Make a copy.
-			Point2 pos = gui.mouse_focus->get_global_transform_with_canvas().affine_inverse().xform(mpos);
-			mb->set_position(pos);
-
-			Control *mouse_focus = gui.mouse_focus;
-
-			// Disable mouse focus if needed before calling input,
-			// this makes popups on mouse press event work better,
-			// as the release will never be received otherwise.
-			if (gui.mouse_focus_mask.is_empty()) {
-				gui.mouse_focus = nullptr;
-				gui.forced_mouse_focus = false;
-			}
-
-			bool stopped = mouse_focus && mouse_focus->can_process() && _gui_call_input(mouse_focus, mb);
-			if (stopped) {
-				set_input_as_handled();
+				ci = ci->get_parent_item();
 			}
 		}
+
+		bool stopped = gui.mouse_focus && gui.mouse_focus->can_process() && _gui_call_input(gui.mouse_focus, mb);
+		if (stopped) {
+			set_input_as_handled();
+		}
+
+		if (gui.dragging && mb->get_button_index() == MouseButton::LEFT) {
+			// Alternate drop use (when using force_drag(), as proposed by #5342).
+			_perform_drop(gui.mouse_focus, pos);
+		}
+
+		_gui_cancel_tooltip();
+	} else {
+		if (gui.dragging && mb->get_button_index() == MouseButton::LEFT) {
+			_perform_drop(gui.drag_mouse_over, gui.drag_mouse_over_pos);
+		}
+
+		gui.mouse_focus_mask.clear_flag(mouse_button_to_mask(mb->get_button_index())); // Remove from mask.
+
+		if (!gui.mouse_focus) {
+			// Release event is only sent if a mouse focus (previously pressed button) exists.
+			return true;
+		}
+
+		mb = mb->xformed_by(Transform2D()); // Make a copy.
+		Point2 pos = gui.mouse_focus->get_global_transform_with_canvas().affine_inverse().xform(mpos);
+		mb->set_position(pos);
+
+		Control *mouse_focus = gui.mouse_focus;
+
+		// Disable mouse focus if needed before calling input,
+		// this makes popups on mouse press event work better,
+		// as the release will never be received otherwise.
+		if (gui.mouse_focus_mask.is_empty()) {
+			gui.mouse_focus = nullptr;
+			gui.forced_mouse_focus = false;
+		}
+
+		bool stopped = mouse_focus && mouse_focus->can_process() && _gui_call_input(mouse_focus, mb);
+		if (stopped) {
+			set_input_as_handled();
+		}
+	}
+
+	return false;
+}
+
+void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
+	ERR_FAIL_COND(p_event.is_null());
+
+	// This is referenced below - is it a bug? Can it ever be valid if the event is a mouse motion type?
+	Ref<InputEventMouseButton> mb = p_event;
+
+	if (_gui_input_event_mousebutton(p_event)) {
+		return;
 	}
 
 	Ref<InputEventMouseMotion> mm = p_event;
