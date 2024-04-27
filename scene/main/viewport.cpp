@@ -2178,6 +2178,12 @@ bool Viewport::_gui_input_event_screendrag(Ref<InputEventScreenDrag> drag_event)
 	return false;
 }
 
+namespace {
+	bool is_action_pressed_joypadmotion(const StringName name, Ref<InputEvent> p_event) {
+		return (p_event->is_action_pressed(name) && Input::get_singleton()->is_action_just_pressed(name));
+	}
+}
+
 void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 	ERR_FAIL_COND(p_event.is_null());
 
@@ -2241,29 +2247,28 @@ void Viewport::_gui_input_event(Ref<InputEvent> p_event) {
 
 			Ref<InputEventJoypadMotion> joypadmotion_event = p_event;
 			if (joypadmotion_event.is_valid()) {
-				Input *input = Input::get_singleton();
 
-				if (p_event->is_action_pressed("ui_focus_next") && input->is_action_just_pressed("ui_focus_next")) {
+				if (is_action_pressed_joypadmotion("ui_focus_next", p_event)) {
 					next = from->find_next_valid_focus();
 				}
 
-				if (p_event->is_action_pressed("ui_focus_prev") && input->is_action_just_pressed("ui_focus_prev")) {
+				if (is_action_pressed_joypadmotion("ui_focus_prev", p_event)) {
 					next = from->find_prev_valid_focus();
 				}
 
-				if (p_event->is_action_pressed("ui_up") && input->is_action_just_pressed("ui_up")) {
+				if (is_action_pressed_joypadmotion("ui_up", p_event)) {
 					next = from->_get_focus_neighbor(SIDE_TOP);
 				}
 
-				if (p_event->is_action_pressed("ui_left") && input->is_action_just_pressed("ui_left")) {
+				if (is_action_pressed_joypadmotion("ui_left", p_event)) {
 					next = from->_get_focus_neighbor(SIDE_LEFT);
 				}
 
-				if (p_event->is_action_pressed("ui_right") && input->is_action_just_pressed("ui_right")) {
+				if (is_action_pressed_joypadmotion("ui_right", p_event)) {
 					next = from->_get_focus_neighbor(SIDE_RIGHT);
 				}
 
-				if (p_event->is_action_pressed("ui_down") && input->is_action_just_pressed("ui_down")) {
+				if (is_action_pressed_joypadmotion("ui_down", p_event)) {
 					next = from->_get_focus_neighbor(SIDE_BOTTOM);
 				}
 			} else {
