@@ -401,6 +401,12 @@ private:
 	Control *_gui_find_control_at_pos(CanvasItem *p_node, const Point2 &p_global, const Transform2D &p_xform);
 
 	void _gui_input_event(Ref<InputEvent> p_event);
+	bool _gui_input_event_mousebutton(Ref<InputEventMouseButton> mb);
+	void _gui_input_event_mousemotion(Ref<InputEventMouseMotion> mm);
+	void _gui_input_event_screentouch(Ref<InputEventScreenTouch> touch_event);
+	bool _gui_input_event_gesture(Ref<InputEventGesture> gesture_event);
+	bool _gui_input_event_screendrag(Ref<InputEventScreenDrag> drag_event);
+
 	void _perform_drop(Control *p_control = nullptr, Point2 p_pos = Point2());
 	void _gui_cleanup_internal_state(Ref<InputEvent> p_event);
 
@@ -435,8 +441,6 @@ private:
 	void _gui_accept_event();
 
 	bool _gui_drop(Control *p_at_control, Point2 p_at_pos, bool p_just_check);
-
-	bool _gui_input_event_mousebutton(Ref<InputEventMouseButton> mb);
 
 	friend class CanvasLayer;
 	void _canvas_layer_add(CanvasLayer *p_canvas_layer);
